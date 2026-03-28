@@ -1,52 +1,31 @@
-name: Build and Push
+name: Docker Build and Push
 
 on:
-  push:
-    branches: [main]
-    tags:
-      - 'v*'
-      - '*.*.*'
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.devcontainer/**'
-      - '.github/copilot-instructions.md'
-      - 'LICENSE'
-      - '.gitignore'
-      - '.env.example'
-      - 'icon-migration-guide.md'
-      - 'dev-helper.js'
-      - 'setup.sh'
-      - 'SETUP.md'
-      - 'DOCKER.md'
-
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.devcontainer/**'
-      - '.github/copilot-instructions.md'
-      - 'LICENSE'
-      - '.gitignore'
-      - '.env.example'
-      - 'icon-migration-guide.md'
-      - 'dev-helper.js'
-      - 'setup.sh'
-      - 'SETUP.md'
-      - 'DOCKER.md'
-
-  workflow_dispatch: {}
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_call:
+    inputs:
+      platforms:
+        type: string
+        default: 'linux/amd64,linux/arm64'
+      dockerfile:
+        type: string
+        default: './Dockerfile'
+      image_title:
+        type: string
+        default: ''
+      image_description:
+        type: string
+        default: ''
+      image_license:
+        type: string
+        default: 'MIT'
+      image_vendor:
+        type: string
+        default: 'chriskacerguis'
 
 jobs:
   build-and-push:
     name: Build and Push Image
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
     permissions:
       contents: read
       packages: write
@@ -71,8 +50,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ github.repository }}
           tags: |
             type=ref,event=tag
             type=semver,pattern={{version}}
@@ -81,14 +59,19 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha
           labels: |
-            org.opencontainers.image.source=${{ github.repository }}
+            org.opencontainers.image.title=${{ inputs.image_title }}
+            org.opencontainers.image.description=${{ inputs.image_description }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=${{ inputs.image_license }}
+            org.opencontainers.image.vendor=${{ inputs.image_vendor }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
+          file: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
           push: true
           sbom: true
           provenance: mode=max
